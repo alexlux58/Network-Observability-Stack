@@ -1,0 +1,24 @@
+filebeat.inputs:
+  - type: filestream
+    id: system-logs
+    enabled: true
+    paths:
+      - /var/log/*.log
+      - /var/log/syslog
+      - /var/log/auth.log
+
+  - type: filestream
+    id: docker-containers
+    enabled: true
+    paths:
+      - /var/lib/docker/containers/*/*.log
+    parsers:
+      - container: ~
+
+output.logstash:
+  hosts: ["logstash:5044"]
+
+processors:
+  - add_host_metadata: {}
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~

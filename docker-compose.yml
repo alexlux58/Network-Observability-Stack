@@ -1,0 +1,127 @@
+name: observability-stack-master
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    environment:
+      - discovery.type=single-node
+      - network.host=0.0.0.0
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - ./data/elasticsearch:/usr/share/elasticsearch/data
+    restart: unless-stopped
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.0
+    depends_on:
+      elasticsearch:
+        condition: service_started
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_HOST=0.0.0.0
+      # Relax CSP to avoid the "Please upgrade your browser" interstitial
+      - CSP_ENABLED=false
+      - CSP_STRICT=false
+      - CSP_WARNLEGACYBROWSERS=false
+    ports:
+      - "5601:5601"
+    volumes:
+      - ./data/kibana:/usr/share/kibana/data
+    restart: unless-stopped
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.15.0
+    depends_on:
+      elasticsearch:
+        condition: service_started
+    environment:
+      - LS_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - ./data/logstash:/usr/share/logstash/data
+    restart: unless-stopped
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.15.0
+    user: root
+    command: ["--strict.perms=false"]
+    depends_on:
+      logstash:
+        condition: service_started
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/log:/var/log:ro
+      # Support both classic docker and snap-docker
+      - ${DOCKER_ROOTDIR:-/var/lib/docker}/containers:/var/lib/docker/containers:ro
+      - ./data/filebeat:/usr/share/filebeat/data
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=8GB
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./data/prometheus:/prometheus
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./data/alertmanager:/alertmanager
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.1.3
+    environment:
+      - GF_SERVER_HTTP_ADDR=0.0.0.0
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data/grafana:/var/lib/grafana
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - ${DOCKER_ROOTDIR:-/var/lib/docker}:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+      - /run/containerd:/run/containerd:ro
+    restart: unless-stopped
+
+  node_exporter:
+    image: prom/node-exporter:v1.8.2
+    command: ["--path.rootfs=/host"]
+    ports:
+      - "9100:9100"
+    volumes:
+      - /:/host:ro
+    restart: unless-stopped

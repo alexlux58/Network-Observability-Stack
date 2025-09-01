@@ -1,0 +1,10 @@
+# Archives & logs
+*.tar.gz
+*.log
+
+# Env files
+.env
+
+# Docker local state (keep empty dirs via .gitkeep)
+data/**
+!data/.gitkeep
