@@ -1,24 +1,45 @@
+# =========================== Inputs ===========================
 filebeat.inputs:
+  # ---- Ubuntu system/auth logs ----
   - type: filestream
-    id: system-logs
+    id: ubuntu-syslog
     enabled: true
     paths:
-      - /var/log/*.log
       - /var/log/syslog
       - /var/log/auth.log
+      - /var/log/kern.log
+      - /var/log/dpkg.log
+    prospector.scanner.exclude_files: ['\.gz$']
 
+  # ---- Docker containers (JSON logs) ----
   - type: filestream
     id: docker-containers
     enabled: true
     paths:
-      - /var/lib/docker/containers/*/*.log
+      - /var/lib/docker/containers/*/*-json.log     # <- exact docker log files
     parsers:
-      - container: ~
+      - ndjson:
+          target: ""         # put parsed keys at root
+          add_error_key: true
+          overwrite_keys: true
+    processors:
+      - add_docker_metadata:
+          host: "unix:///var/run/docker.sock"
+      - decode_json_fields:
+          fields: ["log"]    # decode the "log" field into structured JSON
+          target: "docker"   # keep under "docker.*"
+          overwrite_keys: true
+          add_error_key: true
+      - drop_fields:
+          fields: ["agent","ecs"]   # optional noise trim
+          ignore_missing: true
 
+# ============================== Output ==============================
 output.logstash:
   hosts: ["logstash:5044"]
 
+# ============================== Meta ================================
 processors:
   - add_host_metadata: {}
   - add_cloud_metadata: ~
-  - add_docker_metadata: ~
+
