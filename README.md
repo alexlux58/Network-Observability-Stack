@@ -1,4 +1,4 @@
-# Observability Stack
+# Network Observability Stack
 
 One-command ELK + Prometheus + Grafana stack for a single host. Tested with Docker Engine and snap-docker.
 
