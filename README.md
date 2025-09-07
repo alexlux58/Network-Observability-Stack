@@ -168,7 +168,8 @@ curl -s -X PUT "http://localhost:9200/_index_template/filebeat-template" \
 
 ## 🧰 Disk Growth Utility (LVM on Ubuntu)
 
-Found at https://github.com/alexlux58/MyUtils
+Found at https://github.com/alexlux58/MyUtils 
+
 Grow the VM disk in Proxmox (Hardware → Disk Action → Resize Disk), then inside Ubuntu:
 
 ```bash
