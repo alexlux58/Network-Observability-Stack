@@ -2,6 +2,47 @@
 
 One-command ELK + Prometheus + Grafana stack for a single host. Tested with Docker Engine and snap-docker.
 
+## Repository Overview
+
+This repository wires together an end-to-end observability stack for a single host, combining log collection, metrics, and alerting. Major services include:
+
+- **Filebeat**
+- **Logstash**
+- **Elasticsearch**
+- **Kibana**
+- **Prometheus**
+- **Alertmanager**
+- **Grafana**
+- **cAdvisor**
+- **Node Exporter**
+
+### Top-Level Files
+
+- `README.md` – overview and setup instructions for the stack.
+- `docker-compose.yml` – primary Docker Compose file that launches all services.
+- `docker-compose.yml.bak` – backup compose definition with optional services.
+- `.gitignore` – excludes local and runtime files from version control.
+- `nuke-docker.sh` – utility script to remove containers, volumes, and networks.
+- `setup.sh` – helper script for initial environment configuration.
+
+### Service-Specific Directories
+
+- `alertmanager/alertmanager.yml` – sets routing rules and receivers for Prometheus alerts.
+- `filebeat/filebeat.yml` – collects Ubuntu and Docker logs and sends them to Logstash.
+- `logstash/pipeline/logstash.conf` – accepts Beats input and indexes to Elasticsearch.
+- `prometheus/prometheus.yml` – defines scrape targets and alerting rules.
+
+### How Everything Fits Together
+
+1. Filebeat collects system and Docker logs and ships them to Logstash.
+2. Logstash processes the events and indexes them in Elasticsearch.
+3. Kibana queries Elasticsearch to explore and visualize log data.
+4. Prometheus scrapes metrics from exporters and evaluates alert rules.
+5. Alertmanager receives alerts from Prometheus and dispatches notifications.
+6. Grafana dashboards read from both Elasticsearch and Prometheus for a unified view.
+
+
+
 ## Contents
 
 - Elasticsearch + Kibana + Logstash + Filebeat
