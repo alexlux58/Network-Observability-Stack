@@ -43,6 +43,10 @@ sudo chmod 0640 filebeat/filebeat.yml
 
 # 4) Bring the stack up
 docker compose up -d
+# To keep a fixed project name (for consistent container names):
+#   COMPOSE_PROJECT_NAME=observability-stack-master docker compose up -d
+# or:
+#   docker compose -p observability-stack-master up -d
 
 # 5) (Optional, once) Load Filebeat/Kibana assets
 docker exec -it observability-stack-master-filebeat-1 filebeat test config -e
