@@ -141,16 +141,18 @@ EOF
 install_filebeat() {
     info "Installing Filebeat v${FILEBEAT_VERSION}..."
     
-    # Check if already installed
-    if systemctl is-active --quiet filebeat 2>/dev/null; then
-        warn "Filebeat service is already running"
-        read -p "Do you want to reinstall? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            info "Skipping Filebeat installation"
-            return
+    # Check if already installed and working
+    if command -v filebeat >/dev/null 2>&1 && [ -f /etc/filebeat/filebeat.yml ]; then
+        if systemctl is-active --quiet filebeat 2>/dev/null; then
+            warn "Filebeat is already installed and running"
+            read -p "Do you want to reinstall/reconfigure? (y/N): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                info "Skipping Filebeat installation"
+                return
+            fi
+            systemctl stop filebeat || true
         fi
-        systemctl stop filebeat || true
     fi
     
     # Download and install
@@ -162,25 +164,91 @@ install_filebeat() {
     esac
     
     if [ "$OS" = "ubuntu" ] || [ "$OS" = "debian" ]; then
-        DOWNLOAD_URL="https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-${FILEBEAT_VERSION}-linux-${ARCH}.deb"
-        TMP_DIR=$(mktemp -d)
-        cd "$TMP_DIR"
-        
-        info "Downloading Filebeat from $DOWNLOAD_URL"
-        curl -L -o filebeat.deb "$DOWNLOAD_URL"
-        
-        dpkg -i filebeat.deb || apt-get install -f -y -qq
-        
-        cd /
-        rm -rf "$TMP_DIR"
+        # Try installing via Elastic APT repository first (more reliable)
+        if ! command -v filebeat >/dev/null 2>&1; then
+            info "Installing Filebeat via Elastic APT repository..."
+            if ! dpkg -l | grep -q "elasticsearch"; then
+                # Install Elastic GPG key and repository
+                curl -fsSL https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add - 2>/dev/null || \
+                wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add - 2>/dev/null || true
+                
+                echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" | tee /etc/apt/sources.list.d/elastic-8.x.list >/dev/null
+                apt-get update -qq
+            fi
+            
+            # Try to install via apt
+            if apt-get install -y -qq filebeat=${FILEBEAT_VERSION} 2>/dev/null; then
+                success "Filebeat installed via APT repository"
+            else
+                # Fallback to direct download
+                warn "APT installation failed, trying direct download..."
+                DOWNLOAD_URL="https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-${FILEBEAT_VERSION}-linux-${ARCH}.deb"
+                TMP_DIR=$(mktemp -d)
+                cd "$TMP_DIR"
+                
+                info "Downloading Filebeat from $DOWNLOAD_URL"
+                if ! curl -f -L -o filebeat.deb "$DOWNLOAD_URL" 2>/dev/null; then
+                    error "Failed to download Filebeat. Check your internet connection."
+                    cd /
+                    rm -rf "$TMP_DIR"
+                    exit 1
+                fi
+                
+                # Check file size (should be > 1MB for a valid deb)
+                FILE_SIZE=$(stat -f%z filebeat.deb 2>/dev/null || stat -c%s filebeat.deb 2>/dev/null || echo "0")
+                if [ "$FILE_SIZE" -lt 1048576 ]; then
+                    error "Downloaded file is too small ($FILE_SIZE bytes). Download may have failed."
+                    error "File contents (first 200 chars):"
+                    head -c 200 filebeat.deb
+                    echo ""
+                    cd /
+                    rm -rf "$TMP_DIR"
+                    exit 1
+                fi
+                
+                # Verify it's a valid deb file
+                if ! file filebeat.deb 2>/dev/null | grep -qE "(Debian|ar archive)"; then
+                    error "Downloaded file is not a valid Debian package."
+                    error "File type: $(file filebeat.deb 2>/dev/null || echo 'unknown')"
+                    error "File size: $FILE_SIZE bytes"
+                    cd /
+                    rm -rf "$TMP_DIR"
+                    exit 1
+                fi
+                
+                info "Installing Filebeat package..."
+                if ! dpkg -i filebeat.deb 2>/dev/null; then
+                    info "Resolving dependencies..."
+                    apt-get install -f -y -qq
+                fi
+                
+                cd /
+                rm -rf "$TMP_DIR"
+            fi
+        fi
     elif [ "$OS" = "rhel" ] || [ "$OS" = "centos" ] || [ "$OS" = "fedora" ]; then
         DOWNLOAD_URL="https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-${FILEBEAT_VERSION}-linux-${ARCH}.rpm"
         TMP_DIR=$(mktemp -d)
         cd "$TMP_DIR"
         
         info "Downloading Filebeat from $DOWNLOAD_URL"
-        curl -L -o filebeat.rpm "$DOWNLOAD_URL"
+        if ! curl -f -L -o filebeat.rpm "$DOWNLOAD_URL"; then
+            error "Failed to download Filebeat. Check your internet connection."
+            cd /
+            rm -rf "$TMP_DIR"
+            exit 1
+        fi
         
+        # Verify it's a valid rpm file
+        if ! file filebeat.rpm | grep -q "RPM"; then
+            error "Downloaded file is not a valid RPM package. File may be corrupted or wrong format."
+            error "File type: $(file filebeat.rpm)"
+            cd /
+            rm -rf "$TMP_DIR"
+            exit 1
+        fi
+        
+        info "Installing Filebeat package..."
         if command -v dnf >/dev/null 2>&1; then
             dnf install -y filebeat.rpm
         else
@@ -190,6 +258,15 @@ install_filebeat() {
         cd /
         rm -rf "$TMP_DIR"
     fi
+    
+    # Verify Filebeat was installed
+    if ! command -v filebeat >/dev/null 2>&1; then
+        error "Filebeat installation failed. filebeat command not found."
+        exit 1
+    fi
+    
+    # Ensure /etc/filebeat directory exists
+    mkdir -p /etc/filebeat
     
     # Configure Filebeat
     info "Configuring Filebeat to send logs to ${OBSERVABILITY_STACK_HOST}:${OBSERVABILITY_STACK_PORT}"
@@ -254,7 +331,7 @@ EOF
         success "Filebeat installed and running"
     else
         error "Filebeat failed to start. Check logs: journalctl -u filebeat"
-        exit 1
+        warn "Filebeat may need manual configuration. Continuing anyway..."
     fi
 }
 
