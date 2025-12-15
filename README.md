@@ -1,36 +1,72 @@
-bservability Stack (Master)
+# Network Observability Stack
 
-One-command ELK + Prometheus + Grafana stack for a single host. Tested
-with both classic Docker and snap-docker.
+One-command ELK + Prometheus + Grafana stack for a single host. Tested with Docker Engine and snap-docker.
+
+## Repository Overview
+
+This repository wires together an end-to-end observability stack for a single host, combining log collection, metrics, and alerting. Major services include:
+
+- **Filebeat**
+- **Logstash**
+- **Elasticsearch**
+- **Kibana**
+- **Prometheus**
+- **Alertmanager**
+- **Grafana**
+- **cAdvisor**
+- **Node Exporter**
+
+### Top-Level Files
+
+- `README.md` – overview and setup instructions for the stack.
+- `docker-compose.yml` – primary Docker Compose file that launches all services.
+- `docker-compose.yml.bak` – backup compose definition with optional services.
+- `.gitignore` – excludes local and runtime files from version control.
+- `nuke-docker.sh` – utility script to remove containers, volumes, and networks.
+- `setup.sh` – helper script for initial environment configuration.
+
+### Service-Specific Directories
+
+- `alertmanager/alertmanager.yml` – sets routing rules and receivers for Prometheus alerts.
+- `filebeat/filebeat.yml` – collects Ubuntu and Docker logs and sends them to Logstash.
+- `logstash/pipeline/logstash.conf` – accepts Beats input and indexes to Elasticsearch.
+- `prometheus/prometheus.yml` – defines scrape targets and alerting rules.
+
+### How Everything Fits Together
+
+1. Filebeat collects system and Docker logs and ships them to Logstash.
+2. Logstash processes the events and indexes them in Elasticsearch.
+3. Kibana queries Elasticsearch to explore and visualize log data.
+4. Prometheus scrapes metrics from exporters and evaluates alert rules.
+5. Alertmanager receives alerts from Prometheus and dispatches notifications.
+6. Grafana dashboards read from both Elasticsearch and Prometheus for a unified view.
+
+
 
 ## Contents
 
--   Elasticsearch + Kibana + Logstash + Filebeat
--   Prometheus + Alertmanager
--   Grafana
--   cAdvisor + Node Exporter
+- Elasticsearch + Kibana + Logstash + Filebeat
+- Prometheus + Alertmanager
+- Grafana
+- cAdvisor + Node Exporter
 
 ## Requirements
 
--   Ubuntu (root or sudo)
--   Docker + docker compose
-
-For snap-docker, Filebeat needs the real root dir:
-
-We auto-read it via:
-
-``` bash
-DOCKER_ROOTDIR=$(docker info --format '{{.DockerRootDir}}')
-```
+- Ubuntu (root or sudo)
+- Docker Engine with Docker Compose v2 (`docker compose`)
+- For snap-docker, Filebeat needs the real Docker root dir:
+  ```bash
+  DOCKER_ROOTDIR=$(docker info --format '{{.DockerRootDir}}')
+  ```
 
 ## 🚀 Quickstart
 
-``` bash
+```bash
 # 0) Clone and enter the repo
 git clone https://github.com/<your-username>/observability-stack-master.git
 cd observability-stack-master
 
-# 1) Export or write the Docker root dir (works for both classic & snap-docker)
+# 1) Export or write the Docker root dir
 echo "DOCKER_ROOTDIR=$(docker info --format '{{.DockerRootDir}}')" > .env
 cat .env
 
@@ -48,6 +84,10 @@ sudo chmod 0640 filebeat/filebeat.yml
 
 # 4) Bring the stack up
 docker compose up -d
+# To keep a fixed project name (for consistent container names):
+#   COMPOSE_PROJECT_NAME=observability-stack-master docker compose up -d
+# or:
+#   docker compose -p observability-stack-master up -d
 
 # 5) (Optional, once) Load Filebeat/Kibana assets
 docker exec -it observability-stack-master-filebeat-1 filebeat test config -e
@@ -55,28 +95,29 @@ docker exec -it observability-stack-master-filebeat-1 filebeat test config -e
 # docker exec -it observability-stack-master-filebeat-1 filebeat setup --dashboards
 ```
 
-### Endpoints (replace with your server IP):
+### Endpoints (replace with your server IP)
 
--   Kibana: `http://<IP>:5601`
--   Grafana: `http://<IP>:3000` (default `admin` / `admin`)
--   Prometheus: `http://<IP>:9090`
--   Elasticsearch: `http://<IP>:9200`
--   Alertmanager: `http://<IP>:9093`
--   cAdvisor: `http://<IP>:8080`
--   Node Exporter: `http://<IP>:9100/metrics`
+- Kibana: `http://<IP>:5601`
+- Grafana: `http://<IP>:3000` (default `admin` / `admin`)
+- Prometheus: `http://<IP>:9090`
+- Elasticsearch: `http://<IP>:9200`
+- Alertmanager: `http://<IP>:9093`
+- cAdvisor: `http://<IP>:8080`
+- Node Exporter: `http://<IP>:9100/metrics`
 
 ## 🧩 Integrations (Docker + Ubuntu logs)
 
 We already wired Filebeat and Logstash to collect:
 
-**filebeat/filebeat.yml highlights** - Ubuntu logs via filestream -
-Docker logs via filestream on `*-json.log` + ndjson parser -
-`add_docker_metadata` (requires `/var/run/docker.sock` mount) - Output:
-Logstash `logstash:5044`
+**filebeat/filebeat.yml highlights**
+- Ubuntu logs via filestream
+- Docker logs via filestream on `*-json.log` + ndjson parser
+- `add_docker_metadata` (requires `/var/run/docker.sock` mount)
+- Output: Logstash `logstash:5044`
 
 **docker-compose.yml mounts for Filebeat**
 
-``` yaml
+```yaml
 volumes:
   - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
   - /var/log:/var/log:ro
@@ -85,33 +126,36 @@ volumes:
   - ./data/filebeat:/usr/share/filebeat/data
 ```
 
-**logstash/pipeline/01-beats.conf highlights** - Input:
-`beats { port => 5044 }` - (Optional) promote decoded docker log JSON
-into message - Output: Elasticsearch with ILM rollover alias `filebeat`
+**logstash/pipeline/01-beats.conf highlights**
+- Input: `beats { port => 5044 }`
+- (Optional) promote decoded docker log JSON into message
+- Output: Elasticsearch with ILM rollover alias `filebeat`
 
 ## 📊 Kibana: Create the Data View
 
-1.  Open Kibana → Discover
-2.  Create data view
-    -   Name: `filebeat-*`
-    -   Time field: `@timestamp`
-3.  Filter examples:
-    -   `container.name : "observability-stack-master-kibana-1"`
-    -   `host.hostname : "<your-hostname>"`
-    -   `log.level : "error"`
+1. Open Kibana → Discover
+2. Create data view
+   - Name: `filebeat-*`
+   - Time field: `@timestamp`
+3. Filter examples:
+   - `container.name : "observability-stack-master-kibana-1"`
+   - `host.hostname : "<your-hostname>"`
+   - `log.level : "error"`
 
 ## 🧹 Index Settings & Retention (single node friendly)
 
-``` bash
+```bash
 # replicas 0 for filebeat indices (template)
-curl -s -X PUT "http://localhost:9200/_index_template/filebeat-template"   -H 'Content-Type: application/json' -d '{
+curl -s -X PUT "http://localhost:9200/_index_template/filebeat-template" \
+  -H 'Content-Type: application/json' -d '{
     "index_patterns": ["filebeat-*"],
     "template": { "settings": { "index.number_of_replicas": 0 } },
     "priority": 500
   }'
 
 # 14-day ILM delete policy + apply to template
-curl -s -X PUT "http://localhost:9200/_ilm/policy/filebeat-retain-14d"   -H 'Content-Type: application/json' -d '{
+curl -s -X PUT "http://localhost:9200/_ilm/policy/filebeat-retain-14d" \
+  -H 'Content-Type: application/json' -d '{
     "policy": {
       "phases": {
         "hot": { "actions": {} },
@@ -120,7 +164,8 @@ curl -s -X PUT "http://localhost:9200/_ilm/policy/filebeat-retain-14d"   -H 'Con
     }
   }'
 
-curl -s -X PUT "http://localhost:9200/_index_template/filebeat-template"   -H 'Content-Type: application/json' -d '{
+curl -s -X PUT "http://localhost:9200/_index_template/filebeat-template" \
+  -H 'Content-Type: application/json' -d '{
     "index_patterns": ["filebeat-*"],
     "template": {
       "settings": {
@@ -134,47 +179,45 @@ curl -s -X PUT "http://localhost:9200/_index_template/filebeat-template"   -H 'C
 
 ## 🧯 Common Errors & Fixes
 
--   **Logstash**: Path "/usr/share/logstash/data" must be a writable
-    directory\
-    → Ensure host dir exists and is owned by uid 1000:
+- **Logstash**: Path `/usr/share/logstash/data` must be a writable directory  
+  → Ensure host dir exists and is owned by uid 1000:
+  ```bash
+  sudo mkdir -p data/logstash
+  sudo chown 1000:1000 -R data/logstash
+  sudo chmod 0755 data/logstash
+  ```
 
-    ``` bash
-    sudo mkdir -p data/logstash
-    sudo chown 1000:1000 -R data/logstash
-    sudo chmod 0755 data/logstash
-    ```
+- **Filebeat**: config file (`filebeat.yml`) must be owned by uid=0  
+  →
+  ```bash
+  sudo chown root:root filebeat/filebeat.yml
+  sudo chmod 0640 filebeat/filebeat.yml
+  ```
 
--   **Filebeat**: config file ("filebeat.yml") must be owned by uid=0\
-    →
+- **Elasticsearch red / unassigned shards on single node**  
+  → Set replicas 0 and free disk; clear read-only and retry:
+  ```bash
+  curl -s -X PUT "http://localhost:9200/_all/_settings" \
+    -H 'Content-Type: application/json' \
+    -d '{"index.blocks.read_only_allow_delete": null}'
 
-    ``` bash
-    sudo chown root:root filebeat/filebeat.yml
-    sudo chmod 0640 filebeat/filebeat.yml
-    ```
+  curl -s -X POST "http://localhost:9200/_cluster/reroute?retry_failed=true"
+  ```
 
--   **Elasticsearch red / unassigned shards on single node**\
-    → Set replicas 0 and free disk; clear read-only and retry:
-
-    ``` bash
-    curl -s -X PUT "http://localhost:9200/_all/_settings"     -H 'Content-Type: application/json'     -d '{"index.blocks.read_only_allow_delete": null}'
-
-    curl -s -X POST "http://localhost:9200/_cluster/reroute?retry_failed=true"
-    ```
-
--   **snap-docker bind mount fails at /var/lib/docker**\
-    → Use `${DOCKER_ROOTDIR}` from:
-
-    ``` bash
-    docker info --format '{{.DockerRootDir}}'
-    echo "DOCKER_ROOTDIR=$(docker info --format '{{.DockerRootDir}}')" > .env
-    ```
+- **snap-docker bind mount fails at /var/lib/docker**  
+  → Use `${DOCKER_ROOTDIR}` from:
+  ```bash
+  docker info --format '{{.DockerRootDir}}'
+  echo "DOCKER_ROOTDIR=$(docker info --format '{{.DockerRootDir}}')" > .env
+  ```
 
 ## 🧰 Disk Growth Utility (LVM on Ubuntu)
 
-Grow the VM disk in Proxmox (Hardware → Disk Action → Resize Disk), then
-inside Ubuntu:
+Found at https://github.com/alexlux58/MyUtils 
 
-``` bash
+Grow the VM disk in Proxmox (Hardware → Disk Action → Resize Disk), then inside Ubuntu:
+
+```bash
 # Install deps once
 sudo apt-get update && sudo apt-get install -y cloud-guest-utils lvm2
 
@@ -184,14 +227,14 @@ sudo ./grow-root-lvm.sh      # or --dry-run / --percent 80
 
 Verify:
 
-``` bash
+```bash
 df -h /
 df -h /usr/share/elasticsearch/data
 ```
 
 ## 🧪 Health & Debug Commands
 
-``` bash
+```bash
 # Elasticsearch
 curl -s http://localhost:9200/_cluster/health?pretty
 curl -s 'http://localhost:9200/_cat/indices/filebeat-*?v'
@@ -207,31 +250,30 @@ curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {scra
 
 ## 🔐 Security (optional)
 
-This sample runs without xpack security (for lab use). For production: -
-Enable `xpack.security.enabled: true` in Elasticsearch - Set
-`ELASTIC_PASSWORD`, wire Kibana credentials
-(`ELASTICSEARCH_USERNAME/PASSWORD`) - Put UIs behind a reverse proxy
-(Nginx/Traefik) with TLS + auth
+This sample runs without xpack security (for lab use). For production:
+
+- Enable `xpack.security.enabled: true` in Elasticsearch
+- Set `ELASTIC_PASSWORD`, wire Kibana credentials (`ELASTICSEARCH_USERNAME/PASSWORD`)
+- Put UIs behind a reverse proxy (Nginx/Traefik) with TLS + auth
 
 ## ♻️ Reset Scripts
 
 Keep volumes:
 
-``` bash
+```bash
 ./nuke-docker.sh --remove-networks
 ```
 
 Prune all unused volumes/images/containers:
 
-``` bash
+```bash
 docker system prune -a -f
 docker volume prune -f
 ```
 
 ## 🗺️ Roadmap
 
--   Metricbeat for host/container metrics into Elasticsearch
--   Curated Kibana dashboards for Docker + Ubuntu auth
--   Reverse proxy + SSO front-door (e.g., Traefik + OAuth)
-
+- Metricbeat for host/container metrics into Elasticsearch
+- Curated Kibana dashboards for Docker + Ubuntu auth
+- Reverse proxy + SSO front-door (e.g., Traefik + OAuth)
 
