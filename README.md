@@ -582,6 +582,52 @@ Manage Grafana users via CLI:
 - **Editor** - Can create and edit dashboards, data sources, and alerts
 - **Viewer** - Read-only access to dashboards and data sources
 
+### Log and Data Retention
+
+**All logs and data are automatically rotated/retained to prevent disk space issues:**
+
+**Docker Container Logs:**
+- **Rotation:** Automatic via Docker logging driver
+- **Per service:** Max 10MB per log file, keeps 3 files
+- **Total per service:** ~30MB maximum
+- **Location:** Managed by Docker, accessible via `docker logs` or `./manage.sh logs <service>`
+- **Configuration:** Set in `docker-compose.yml` logging section
+
+**Elasticsearch Log Data:**
+- **Retention:** 14 days (configurable via ILM policy)
+- **Auto-deletion:** Old indices automatically deleted after retention period
+- **Setup:** Run the ILM policy commands below (one-time setup)
+- **Storage:** `./data/elasticsearch/` directory
+
+**Prometheus Metrics:**
+- **Retention:** 15 days OR 8GB (whichever comes first)
+- **Auto-cleanup:** Prometheus automatically deletes old data
+- **Configuration:** Set in `docker-compose.yml` Prometheus command
+- **Storage:** `./data/prometheus/` directory
+
+**Filebeat Registry:**
+- **Purpose:** Tracks file positions to avoid re-reading logs
+- **Growth:** Minimal, but can be cleaned if needed
+- **Location:** `./data/filebeat/registry/`
+- **Cleanup:** Only needed if switching log sources or troubleshooting
+
+**System Logs (collected by Filebeat):**
+- **Rotation:** Handled by system `logrotate` (Ubuntu default)
+- **Location:** `/var/log/syslog`, `/var/log/auth.log`, etc.
+- **System-managed:** Automatically rotated by OS
+
+**To check disk usage:**
+```bash
+# Check data directory sizes
+du -sh ./data/*
+
+# Check Docker log sizes
+docker system df
+
+# Check specific service logs
+docker inspect <container-name> | grep -A 5 LogPath
+```
+
 ### Index Management
 
 **Set replicas to 0 (single node friendly):**
@@ -594,9 +640,9 @@ curl -s -X PUT "http://localhost:9200/_index_template/filebeat-template" \
   }'
 ```
 
-**Configure 14-day retention:**
+**Configure 14-day retention (Recommended - prevents disk space issues):**
 ```bash
-# Create ILM policy
+# Create ILM policy (one-time setup)
 curl -s -X PUT "http://localhost:9200/_ilm/policy/filebeat-retain-14d" \
   -H 'Content-Type: application/json' -d '{
     "policy": {
@@ -607,7 +653,7 @@ curl -s -X PUT "http://localhost:9200/_ilm/policy/filebeat-retain-14d" \
     }
   }'
 
-# Apply to template
+# Apply to template (includes replicas=0 for single node)
 curl -s -X PUT "http://localhost:9200/_index_template/filebeat-template" \
   -H 'Content-Type: application/json' -d '{
     "index_patterns": ["filebeat-*"],
@@ -620,6 +666,22 @@ curl -s -X PUT "http://localhost:9200/_index_template/filebeat-template" \
     "priority": 500
   }'
 ```
+
+**Verify retention is working:**
+```bash
+# Check ILM policy exists
+curl -s http://localhost:9200/_ilm/policy/filebeat-retain-14d?pretty
+
+# Check index template
+curl -s http://localhost:9200/_index_template/filebeat-template?pretty
+
+# Monitor index lifecycle status
+curl -s 'http://localhost:9200/_cat/indices/filebeat-*?v&h=index,creation.date,status'
+```
+
+**Adjust retention period (optional):**
+- Change `"min_age": "14d"` to your desired retention (e.g., `"7d"`, `"30d"`)
+- Re-run the ILM policy creation command with new value
 
 ### Backup and Restore
 

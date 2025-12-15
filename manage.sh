@@ -90,6 +90,7 @@ Commands:
   clean      - Clean up containers/volumes
                Options: --remove-volumes (DANGEROUS: removes all data)
   health     - Run health checks on all services
+  disk       - Check disk usage for data directories and logs
   user       - Manage Grafana users
                Usage: $0 user [create|list|delete|change-password] [options]
                Examples:
@@ -418,6 +419,60 @@ cmd_health() {
     fi
 }
 
+# Disk usage command
+cmd_disk() {
+    info "Checking disk usage..."
+    echo ""
+    
+    # Check data directories
+    if [ -d ./data ]; then
+        info "Data directory sizes:"
+        du -sh ./data/* 2>/dev/null | sort -h || warn "Could not read data directory sizes"
+        echo ""
+        
+        # Calculate total
+        TOTAL=$(du -sh ./data 2>/dev/null | awk '{print $1}' || echo "unknown")
+        info "Total data directory size: $TOTAL"
+        echo ""
+    fi
+    
+    # Check Docker disk usage
+    info "Docker disk usage:"
+    $DOCKER_CMD system df 2>/dev/null || warn "Could not get Docker disk usage"
+    echo ""
+    
+    # Check system disk space
+    info "System disk space:"
+    df -h / 2>/dev/null | tail -1 || warn "Could not get disk space"
+    echo ""
+    
+    # Check if data directory is on same partition
+    DATA_PATH=$(pwd)/data
+    info "Data directory location: $DATA_PATH"
+    
+    # Show retention status
+    echo ""
+    info "Retention Status:"
+    
+    # Prometheus retention
+    RETENTION=$(grep -o "retention.time=[0-9]*[dw]" docker-compose.yml | head -1 | cut -d'=' -f2 || echo "unknown")
+    RETENTION_SIZE=$(grep -o "retention.size=[0-9]*[GM]B" docker-compose.yml | head -1 | cut -d'=' -f2 || echo "unknown")
+    if [ "$RETENTION" != "unknown" ] || [ "$RETENTION_SIZE" != "unknown" ]; then
+        echo "  Prometheus: ${RETENTION} or ${RETENTION_SIZE} (whichever comes first)"
+    fi
+    
+    # Elasticsearch ILM
+    if curl -s http://localhost:9200/_ilm/policy/filebeat-retain-14d >/dev/null 2>&1; then
+        ES_RETENTION=$(curl -s http://localhost:9200/_ilm/policy/filebeat-retain-14d?pretty 2>/dev/null | grep -o '"min_age":"[^"]*"' | cut -d'"' -f4 || echo "14d")
+        echo "  Elasticsearch: ${ES_RETENTION} (ILM policy configured)"
+    else
+        warn "  Elasticsearch: No ILM policy configured (see README for setup)"
+    fi
+    
+    # Docker logs
+    echo "  Docker logs: 10MB per file, 3 files max (~30MB per service)"
+}
+
 # Main command router
 main() {
     COMMAND=${1:-help}
@@ -450,6 +505,9 @@ main() {
             ;;
         health)
             cmd_health
+            ;;
+        disk)
+            cmd_disk
             ;;
         user)
             shift
