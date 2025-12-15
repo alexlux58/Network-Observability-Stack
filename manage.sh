@@ -51,6 +51,13 @@ Commands:
   clean      - Clean up containers/volumes
                Options: --remove-volumes (DANGEROUS: removes all data)
   health     - Run health checks on all services
+  user       - Manage Grafana users
+               Usage: $0 user [create|list|delete|change-password] [options]
+               Examples:
+                 $0 user create john john@example.com password123 Viewer
+                 $0 user list
+                 $0 user delete john
+                 $0 user change-password john newpassword123
   help       - Show this help message
 
 Examples:
@@ -60,6 +67,7 @@ Examples:
   $0 logs filebeat
   $0 fix
   $0 clean
+  $0 user create alice alice@example.com secret123 Editor
 
 EOF
 }
@@ -384,6 +392,10 @@ main() {
         health)
             cmd_health
             ;;
+        user)
+            shift
+            cmd_user "$@"
+            ;;
         help|--help|-h)
             usage
             ;;
@@ -391,6 +403,194 @@ main() {
             error "Unknown command: $COMMAND"
             echo ""
             usage
+            exit 1
+            ;;
+    esac
+}
+
+# User management command
+cmd_user() {
+    SUBCOMMAND=${1:-}
+    
+    if [ -z "$SUBCOMMAND" ]; then
+        error "Please specify a user subcommand: create, list, delete, change-password"
+        echo ""
+        echo "Examples:"
+        echo "  $0 user create <username> <email> <password> [role]"
+        echo "  $0 user list"
+        echo "  $0 user delete <username>"
+        echo "  $0 user change-password <username> <new-password>"
+        echo ""
+        echo "Roles: Admin, Editor, Viewer (default: Viewer)"
+        exit 1
+    fi
+    
+    # Get Grafana admin credentials from .env
+    if [ -f .env ]; then
+        source .env
+    fi
+    GRAFANA_USER=${GRAFANA_ADMIN_USER:-admin}
+    GRAFANA_PASS=${GRAFANA_ADMIN_PASSWORD:-admin}
+    GRAFANA_URL="http://localhost:3000"
+    
+    # Check if Grafana is running
+    if ! curl -s "${GRAFANA_URL}/api/health" >/dev/null 2>&1; then
+        error "Grafana is not running. Start it with: $0 start"
+        exit 1
+    fi
+    
+    case "$SUBCOMMAND" in
+        create)
+            USERNAME=${2:-}
+            EMAIL=${3:-}
+            PASSWORD=${4:-}
+            ROLE=${5:-Viewer}
+            
+            if [ -z "$USERNAME" ] || [ -z "$EMAIL" ] || [ -z "$PASSWORD" ]; then
+                error "Usage: $0 user create <username> <email> <password> [role]"
+                echo "Roles: Admin, Editor, Viewer (default: Viewer)"
+                exit 1
+            fi
+            
+            # Validate role
+            if [[ ! "$ROLE" =~ ^(Admin|Editor|Viewer)$ ]]; then
+                error "Invalid role: $ROLE. Must be Admin, Editor, or Viewer"
+                exit 1
+            fi
+            
+            info "Creating Grafana user: $USERNAME"
+            
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+                -H "Content-Type: application/json" \
+                -u "${GRAFANA_USER}:${GRAFANA_PASS}" \
+                -d "{
+                    \"name\": \"$USERNAME\",
+                    \"email\": \"$EMAIL\",
+                    \"login\": \"$USERNAME\",
+                    \"password\": \"$PASSWORD\",
+                    \"OrgId\": 1
+                }" \
+                "${GRAFANA_URL}/api/admin/users")
+            
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+            
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+                USER_ID=$(echo "$BODY" | grep -o '"id":[0-9]*' | cut -d':' -f2)
+                
+                # Set user role
+                curl -s -X PUT \
+                    -H "Content-Type: application/json" \
+                    -u "${GRAFANA_USER}:${GRAFANA_PASS}" \
+                    -d "{\"role\": \"$ROLE\"}" \
+                    "${GRAFANA_URL}/api/org/users/${USER_ID}" >/dev/null
+                
+                success "User '$USERNAME' created successfully with role '$ROLE'"
+            else
+                ERROR_MSG=$(echo "$BODY" | grep -o '"message":"[^"]*"' | cut -d'"' -f4 || echo "Unknown error")
+                error "Failed to create user: $ERROR_MSG (HTTP $HTTP_CODE)"
+                exit 1
+            fi
+            ;;
+            
+        list)
+            info "Listing Grafana users:"
+            echo ""
+            
+            RESPONSE=$(curl -s -u "${GRAFANA_USER}:${GRAFANA_PASS}" \
+                "${GRAFANA_URL}/api/users")
+            
+            if echo "$RESPONSE" | grep -q '"id"'; then
+                # Try to parse JSON nicely, fallback to raw output
+                if command -v jq >/dev/null 2>&1; then
+                    echo "$RESPONSE" | jq -r '.[] | "  - \(.login) (\(.email)) - Role: \(.role // "N/A")"'
+                elif command -v python3 >/dev/null 2>&1; then
+                    echo "$RESPONSE" | python3 -c "import sys, json; [print(f\"  - {u['login']} ({u['email']})\") for u in json.load(sys.stdin)]" 2>/dev/null || echo "$RESPONSE"
+                else
+                    echo "$RESPONSE" | grep -o '"login":"[^"]*","email":"[^"]*"' | \
+                        sed 's/"login":"\([^"]*\)","email":"\([^"]*\)"/  - \1 (\2)/' || echo "$RESPONSE"
+                fi
+            else
+                warn "No users found or unable to fetch users"
+            fi
+            ;;
+            
+        delete)
+            USERNAME=${2:-}
+            
+            if [ -z "$USERNAME" ]; then
+                error "Usage: $0 user delete <username>"
+                exit 1
+            fi
+            
+            # Get user ID
+            USER_ID=$(curl -s -u "${GRAFANA_USER}:${GRAFANA_PASS}" \
+                "${GRAFANA_URL}/api/users/lookup?loginOrEmail=${USERNAME}" | \
+                grep -o '"id":[0-9]*' | cut -d':' -f2)
+            
+            if [ -z "$USER_ID" ]; then
+                error "User '$USERNAME' not found"
+                exit 1
+            fi
+            
+            warn "Deleting user: $USERNAME (ID: $USER_ID)"
+            read -p "Are you sure? (yes/no): " confirm
+            
+            if [ "$confirm" != "yes" ]; then
+                info "Cancelled"
+                exit 0
+            fi
+            
+            HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X DELETE \
+                -u "${GRAFANA_USER}:${GRAFANA_PASS}" \
+                "${GRAFANA_URL}/api/admin/users/${USER_ID}")
+            
+            if [ "$HTTP_CODE" = "200" ]; then
+                success "User '$USERNAME' deleted successfully"
+            else
+                error "Failed to delete user (HTTP $HTTP_CODE)"
+                exit 1
+            fi
+            ;;
+            
+        change-password)
+            USERNAME=${2:-}
+            NEW_PASSWORD=${3:-}
+            
+            if [ -z "$USERNAME" ] || [ -z "$NEW_PASSWORD" ]; then
+                error "Usage: $0 user change-password <username> <new-password>"
+                exit 1
+            fi
+            
+            # Get user ID
+            USER_ID=$(curl -s -u "${GRAFANA_USER}:${GRAFANA_PASS}" \
+                "${GRAFANA_URL}/api/users/lookup?loginOrEmail=${USERNAME}" | \
+                grep -o '"id":[0-9]*' | cut -d':' -f2)
+            
+            if [ -z "$USER_ID" ]; then
+                error "User '$USERNAME' not found"
+                exit 1
+            fi
+            
+            info "Changing password for user: $USERNAME"
+            
+            HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X PUT \
+                -H "Content-Type: application/json" \
+                -u "${GRAFANA_USER}:${GRAFANA_PASS}" \
+                -d "{\"password\": \"$NEW_PASSWORD\"}" \
+                "${GRAFANA_URL}/api/admin/users/${USER_ID}/password")
+            
+            if [ "$HTTP_CODE" = "200" ]; then
+                success "Password changed successfully for user '$USERNAME'"
+            else
+                error "Failed to change password (HTTP $HTTP_CODE)"
+                exit 1
+            fi
+            ;;
+            
+        *)
+            error "Unknown user subcommand: $SUBCOMMAND"
+            echo "Available subcommands: create, list, delete, change-password"
             exit 1
             ;;
     esac

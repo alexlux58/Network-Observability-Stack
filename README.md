@@ -138,6 +138,28 @@ GRAFANA_ADMIN_PASSWORD=admin
 - `prometheus/alerts.yml` - Alert definitions
 - `alertmanager/alertmanager.yml` - Alert routing configuration
 
+### Docker Compose Features
+
+The `docker-compose.yml` includes several enhancements for better reliability and monitoring:
+
+**Health Checks:**
+- All services have health checks configured
+- Docker automatically monitors and restarts unhealthy containers
+- Services wait for dependencies to be healthy before starting
+
+**Logging:**
+- Automatic log rotation (10MB per file, max 3 files per service)
+- Prevents disk space issues from log growth
+- Logs accessible via `docker logs` or `./manage.sh logs <service>`
+
+**Resource Limits:**
+- Memory limits set for exporters (cAdvisor, Node Exporter)
+- Prevents resource exhaustion
+
+**Service Labels:**
+- Services labeled with `com.observability.service` and `com.observability.role`
+- Helps organize and filter containers
+
 ### Data Collection
 
 **Filebeat collects:**
@@ -170,6 +192,7 @@ Commands:
   fix        - Fix common issues (lock files, permissions, stuck containers)
   clean      - Clean up containers/volumes (with options)
   health     - Run health checks on all services
+  user       - Manage Grafana users (create, list, delete, change-password)
 ```
 
 ### Examples
@@ -192,6 +215,18 @@ Commands:
 
 # Run health checks
 ./manage.sh health
+
+# Create a Grafana user
+./manage.sh user create john john@example.com password123 Editor
+
+# List Grafana users
+./manage.sh user list
+
+# Change user password
+./manage.sh user change-password john newpassword456
+
+# Delete a Grafana user
+./manage.sh user delete john
 ```
 
 ### Manual Docker Compose Commands
@@ -489,6 +524,41 @@ This checks:
 - Elasticsearch cluster health
 - Prometheus targets
 - Service endpoints
+
+**Note:** All services now have health checks configured in `docker-compose.yml`. Docker automatically monitors service health and can restart unhealthy containers. Health check status is visible in `docker ps` output.
+
+### User Management
+
+Manage Grafana users via CLI:
+
+**Create a user:**
+```bash
+./manage.sh user create <username> <email> <password> [role]
+# Roles: Admin, Editor, Viewer (default: Viewer)
+# Example:
+./manage.sh user create alice alice@example.com secret123 Editor
+```
+
+**List all users:**
+```bash
+./manage.sh user list
+```
+
+**Change user password:**
+```bash
+./manage.sh user change-password <username> <new-password>
+```
+
+**Delete a user:**
+```bash
+./manage.sh user delete <username>
+# Requires confirmation
+```
+
+**User Roles:**
+- **Admin** - Full access to all features and settings
+- **Editor** - Can create and edit dashboards, data sources, and alerts
+- **Viewer** - Read-only access to dashboards and data sources
 
 ### Index Management
 
