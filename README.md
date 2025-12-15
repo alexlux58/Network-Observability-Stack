@@ -720,6 +720,10 @@ This stack runs **without security** for lab/testing use:
 **Prometheus Monitoring:**
 - **893** - Prometheus 2.0 Stats
 
+**AWS S3 Monitoring (requires CloudWatch data source):**
+- **22632** - AWS S3 CloudWatch - Monitors S3 buckets, storage metrics, request metrics, and replication metrics
+- **Note:** Requires AWS CloudWatch data source configuration and AWS credentials
+
 **Note:** Dashboards 179 and 3662 use deprecated Angular framework and may not work in Grafana 11+. Use the alternatives listed above instead.
 
 Browse more at: https://grafana.com/grafana/dashboards/
