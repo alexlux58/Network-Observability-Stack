@@ -284,10 +284,18 @@ Grafana has thousands of community dashboards. Recommended ones:
 - Dashboard ID: **1860** (Node Exporter Full) - Comprehensive host metrics
 
 **Container Monitoring:**
-- Dashboard ID: **179** (Docker Container & Host Metrics)
+- Dashboard ID: **11074** (Node Exporter for Prometheus) - Modern React-based dashboard
+- Dashboard ID: **6417** (Docker Container Stats) - Container metrics dashboard
+- **Note:** Dashboard 179 uses deprecated Angular and may not work in newer Grafana versions
 
 **Prometheus Stats:**
-- Dashboard ID: **3662** (Prometheus Stats)
+- Dashboard ID: **893** (Prometheus 2.0 Stats) - Prometheus monitoring dashboard
+- **Note:** Dashboard 3662 uses deprecated Angular and may not work in newer Grafana versions
+
+**Search Tips:**
+- Look for dashboards marked as "React" or "Modern" in Grafana dashboard library
+- Filter by "Updated" date to find recently maintained dashboards
+- Avoid dashboards marked as "Angular" or "Legacy"
 
 **To import:**
 1. Go to **Dashboards** → **Import**
