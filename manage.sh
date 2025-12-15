@@ -1,31 +1,46 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
 # Network Observability Stack Management Script
 # Unified interface for managing the observability stack
+
+# Don't exit on unset vars - we'll handle them explicitly
+set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Color output functions
+# Color output functions (error goes to stderr)
 info() { printf "\033[1;36m==> %s\033[0m\n" "$*"; }
 success() { printf "\033[1;32m✓ %s\033[0m\n" "$*"; }
 warn() { printf "\033[1;33m⚠ %s\033[0m\n" "$*"; }
-error() { printf "\033[1;31m✗ %s\033[0m\n" "$*"; }
+error() { printf "\033[1;31m✗ %s\033[0m\n" "$*" >&2; }
 
-# Detect Docker command (handle snap-docker)
+# Detect Docker command (handle snap-docker and root user)
 detect_docker() {
-    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    # If running as root, don't use sudo
+    if [ "$(id -u)" -eq 0 ]; then
+        if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+            echo "docker"
+        else
+            error "Cannot connect to Docker daemon (running as root)"
+            return 1
+        fi
+    # Running as regular user
+    elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
         echo "docker"
     elif sudo docker info >/dev/null 2>&1; then
         echo "sudo docker"
     else
         error "Cannot connect to Docker daemon"
-        exit 1
+        error "Try: sudo usermod -aG docker $USER && newgrp docker"
+        error "Or run this script with sudo"
+        return 1
     fi
 }
 
 DOCKER_CMD=$(detect_docker)
+if [ $? -ne 0 ]; then
+    exit 1
+fi
 
 # Detect Docker Compose command (docker compose or docker-compose)
 detect_compose() {
@@ -42,11 +57,14 @@ detect_compose() {
         error "Docker Compose not found. Please install Docker Compose."
         error "Try: sudo apt-get install docker-compose-plugin (for docker compose)"
         error "Or: sudo apt-get install docker-compose (for docker-compose)"
-        exit 1
+        return 1
     fi
 }
 
 COMPOSE_CMD=$(detect_compose)
+if [ $? -ne 0 ]; then
+    exit 1
+fi
 
 # Get server IP
 get_server_ip() {
