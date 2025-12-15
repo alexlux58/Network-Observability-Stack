@@ -27,6 +27,27 @@ detect_docker() {
 
 DOCKER_CMD=$(detect_docker)
 
+# Detect Docker Compose command (docker compose or docker-compose)
+detect_compose() {
+    # Try docker compose (plugin, newer)
+    if $DOCKER_CMD compose version >/dev/null 2>&1; then
+        echo "compose"
+    # Try docker-compose (standalone, older)
+    elif command -v docker-compose >/dev/null 2>&1 && docker-compose version >/dev/null 2>&1; then
+        echo "docker-compose"
+    # Try sudo docker-compose if DOCKER_CMD is sudo docker
+    elif [ "$DOCKER_CMD" = "sudo docker" ] && command -v docker-compose >/dev/null 2>&1; then
+        echo "sudo docker-compose"
+    else
+        error "Docker Compose not found. Please install Docker Compose."
+        error "Try: sudo apt-get install docker-compose-plugin (for docker compose)"
+        error "Or: sudo apt-get install docker-compose (for docker-compose)"
+        exit 1
+    fi
+}
+
+COMPOSE_CMD=$(detect_compose)
+
 # Get server IP
 get_server_ip() {
     hostname -I 2>/dev/null | awk '{print $1}' || echo "<your-server-ip>"
@@ -137,7 +158,11 @@ cmd_start() {
     fi
     
     # Start services
-    $DOCKER_CMD compose up -d
+    if [ "$COMPOSE_CMD" = "compose" ]; then
+        $DOCKER_CMD compose up -d
+    else
+        $COMPOSE_CMD up -d
+    fi
     
     info "Waiting for services to initialize..."
     sleep 5
@@ -161,14 +186,22 @@ cmd_start() {
 # Stop command
 cmd_stop() {
     info "Stopping all services..."
-    $DOCKER_CMD compose down
+    if [ "$COMPOSE_CMD" = "compose" ]; then
+        $DOCKER_CMD compose down
+    else
+        $COMPOSE_CMD down
+    fi
     success "Services stopped"
 }
 
 # Restart command
 cmd_restart() {
     info "Restarting all services..."
-    $DOCKER_CMD compose restart
+    if [ "$COMPOSE_CMD" = "compose" ]; then
+        $DOCKER_CMD compose restart
+    else
+        $COMPOSE_CMD restart
+    fi
     success "Services restarted"
 }
 
@@ -287,12 +320,20 @@ cmd_clean() {
             exit 0
         fi
         info "Removing containers, images, and volumes..."
-        $DOCKER_CMD compose down -v
+        if [ "$COMPOSE_CMD" = "compose" ]; then
+            $DOCKER_CMD compose down -v
+        else
+            $COMPOSE_CMD down -v
+        fi
         $DOCKER_CMD system prune -a -f
         $DOCKER_CMD volume prune -f
     else
         info "Cleaning containers and images (keeping volumes)..."
-        $DOCKER_CMD compose down
+        if [ "$COMPOSE_CMD" = "compose" ]; then
+            $DOCKER_CMD compose down
+        else
+            $COMPOSE_CMD down
+        fi
         $DOCKER_CMD system prune -a -f --volumes=false
     fi
     
