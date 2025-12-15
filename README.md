@@ -709,12 +709,18 @@ This stack runs **without security** for lab/testing use:
 
 ### Useful Grafana Dashboard IDs
 
-- **1860** - Node Exporter Full
-- **179** - Docker Container & Host Metrics
-- **3662** - Prometheus Stats
-- **11074** - Node Exporter for Prometheus
-- **893** - Prometheus 2.0 Stats
+**Host Metrics:**
+- **1860** - Node Exporter Full (comprehensive host metrics)
+- **11074** - Node Exporter for Prometheus (modern React-based)
+
+**Container Metrics:**
 - **6417** - Docker Container Stats
+- **11074** - Node Exporter for Prometheus (includes container metrics)
+
+**Prometheus Monitoring:**
+- **893** - Prometheus 2.0 Stats
+
+**Note:** Dashboards 179 and 3662 use deprecated Angular framework and may not work in Grafana 11+. Use the alternatives listed above instead.
 
 Browse more at: https://grafana.com/grafana/dashboards/
 
