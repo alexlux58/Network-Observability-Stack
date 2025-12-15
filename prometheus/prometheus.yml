@@ -18,6 +18,43 @@ scrape_configs:
     static_configs:
       - targets: ['cadvisor:8080']
 
+  - job_name: 'blackbox_exporter'
+    static_configs:
+      - targets: ['blackbox_exporter:9115']
+
+  # Remote VM monitoring - add your VM IPs here
+  # After deploying install-node-exporter.sh on a VM, add its IP below
+  - job_name: 'remote_node_exporter'
+    scrape_interval: 15s
+    static_configs:
+      # Example: Add your VM IPs here
+      - targets: ['192.168.5.8:9100']
+        labels:
+          host: 'ansible-puppet'
+          env: 'production'
+
+  # Ping/uptime monitoring for remote VMs using blackbox_exporter
+  # Add VM IPs or hostnames here to monitor their availability
+  - job_name: 'blackbox_icmp'
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    scrape_interval: 30s
+    static_configs:
+      # Example: Add your VM IPs or hostnames here
+      - targets:
+          - '192.168.5.8'  # ansible-puppet
+        labels:
+          host: 'ansible-puppet'
+          env: 'production'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox_exporter:9115
+
 alerting:
   alertmanagers:
     - static_configs:

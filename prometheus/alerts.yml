@@ -143,3 +143,33 @@ groups:
           summary: "High scrape duration for {{ $labels.job }}/{{ $labels.instance }}"
           description: "Scrape duration is {{ $value }}s, which is higher than expected"
 
+  - name: uptime_alerts
+    interval: 30s
+    rules:
+      - alert: HostDown
+        expr: probe_success{job="blackbox_icmp"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host {{ $labels.instance }} is down (ping failed)"
+          description: "Host {{ $labels.instance }} ({{ $labels.host }}) has been unreachable via ICMP ping for 2 minutes"
+
+      - alert: HostHighLatency
+        expr: probe_duration_seconds{job="blackbox_icmp"} > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency detected for {{ $labels.instance }}"
+          description: "Ping latency to {{ $labels.instance }} ({{ $labels.host }}) is {{ $value }}s, which is higher than expected"
+
+      - alert: RemoteNodeExporterDown
+        expr: up{job="remote_node_exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Remote Node Exporter is down on {{ $labels.instance }}"
+          description: "Node Exporter on {{ $labels.instance }} ({{ $labels.host }}) has been down for more than 2 minutes"
+

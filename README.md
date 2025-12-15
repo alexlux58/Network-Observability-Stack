@@ -58,6 +58,7 @@ This repository wires together an end-to-end observability stack for a single ho
 - **Grafana** - Unified dashboards for metrics and logs
 - **cAdvisor** - Container metrics exporter
 - **Node Exporter** - Host metrics exporter
+- **Blackbox Exporter** - Ping/uptime monitoring for remote hosts
 
 ### Data Flow
 
@@ -401,6 +402,150 @@ To customize alerts, edit `prometheus/alerts.yml` and restart Prometheus:
 ```bash
 docker compose restart prometheus
 ```
+
+---
+
+## 🌐 Monitoring Remote Linux VMs
+
+This stack can monitor remote Linux VMs for resource utilization, log errors, and uptime (ping monitoring).
+
+### Quick Start
+
+**On the remote Linux VM:**
+
+1. Copy the `install-node-exporter.sh` script to your VM:
+   ```bash
+   scp install-node-exporter.sh user@your-vm-ip:/tmp/
+   ```
+
+2. SSH into the VM and run the installation script:
+   ```bash
+   ssh user@your-vm-ip
+   sudo bash /tmp/install-node-exporter.sh
+   ```
+
+   The script will:
+   - Install `node_exporter` for system metrics (CPU, memory, disk, network)
+   - Install `Filebeat` to send logs to your observability stack
+   - Configure firewall rules (if applicable)
+   - Set up systemd services
+
+**On the observability stack host (192.168.5.34):**
+
+3. Edit `prometheus/prometheus.yml` and add your VM to the monitoring targets:
+
+   **For metrics (node_exporter):**
+   ```yaml
+   - job_name: 'remote_node_exporter'
+     scrape_interval: 15s
+     static_configs:
+       - targets: ['192.168.5.8:9100']  # Replace with your VM IP
+         labels:
+           host: 'ansible-puppet'  # Replace with your VM hostname
+           env: 'production'
+   ```
+
+   **For uptime/ping monitoring:**
+   ```yaml
+   - job_name: 'blackbox_icmp'
+     metrics_path: /probe
+     params:
+       module: [icmp]
+     scrape_interval: 30s
+     static_configs:
+       - targets:
+           - '192.168.5.8'  # Replace with your VM IP or hostname
+         labels:
+           host: 'ansible-puppet'  # Replace with your VM hostname
+           env: 'production'
+   ```
+
+4. Reload Prometheus configuration:
+   ```bash
+   curl -X POST http://localhost:9090/-/reload
+   ```
+
+5. Verify targets are up in Prometheus:
+   - Visit `http://192.168.5.34:9090/targets`
+   - Check that `remote_node_exporter` and `blackbox_icmp` targets show as "UP"
+
+### What Gets Monitored
+
+**System Metrics (via node_exporter):**
+- CPU usage, load average
+- Memory usage (total, available, swap)
+- Disk usage and I/O
+- Network traffic (bytes sent/received)
+- System uptime
+
+**Logs (via Filebeat):**
+- System logs (`/var/log/syslog`, `/var/log/messages`, `/var/log/auth.log`)
+- Application logs (`/var/log/*.log`)
+- All logs are sent to Logstash and indexed in Elasticsearch
+- View logs in Kibana: `http://192.168.5.34:5601`
+
+**Uptime/Ping (via blackbox_exporter):**
+- ICMP ping monitoring
+- Latency metrics
+- Availability status
+- Alerts when host is down
+
+### Grafana Dashboards
+
+After adding your VM, import these dashboards in Grafana:
+
+**Host Metrics:**
+- Dashboard ID: **1860** (Node Exporter Full) - Shows CPU, memory, disk, network
+- Filter by `host="your-vm-hostname"` to see your VM's metrics
+
+**Uptime Monitoring:**
+- Create a custom dashboard with:
+  - **Uptime Panel**: `probe_success{host="your-vm-hostname"}`
+  - **Latency Panel**: `probe_duration_seconds{host="your-vm-hostname"}`
+  - **Status Stat**: `probe_success{host="your-vm-hostname"}` (1 = up, 0 = down)
+
+**Logs:**
+- In Kibana, create a data view for `filebeat-*`
+- Filter by `hostname: "your-vm-hostname"` to see logs from your VM
+
+### Alerts
+
+The following alerts are automatically configured for remote VMs:
+
+- **HostDown**: Triggers when ping fails for 2 minutes
+- **HostHighLatency**: Triggers when ping latency > 1 second for 5 minutes
+- **RemoteNodeExporterDown**: Triggers when node_exporter is unreachable for 2 minutes
+- **HighCPUUsage**, **HighMemoryUsage**, **DiskSpaceLow**: Same as local host alerts
+
+### Troubleshooting Remote VMs
+
+**VM not showing up in Prometheus:**
+1. Check firewall: Ensure port 9100 is accessible from 192.168.5.34
+2. Verify node_exporter is running: `systemctl status node_exporter` on the VM
+3. Test connectivity: `curl http://vm-ip:9100/metrics` from the stack host
+
+**Logs not appearing in Kibana:**
+1. Check Filebeat status: `systemctl status filebeat` on the VM
+2. Verify connectivity: `telnet 192.168.5.34 5044` from the VM
+3. Check Filebeat logs: `journalctl -u filebeat -f` on the VM
+
+**Ping monitoring not working:**
+1. Ensure blackbox_exporter is running: `docker ps | grep blackbox`
+2. Verify ICMP is allowed (blackbox_exporter needs NET_RAW capability)
+3. Check Prometheus targets: `http://192.168.5.34:9090/targets`
+
+### Customizing the Installation Script
+
+You can customize the observability stack host IP by setting an environment variable:
+
+```bash
+OBSERVABILITY_STACK_HOST=192.168.5.34 sudo bash install-node-exporter.sh
+```
+
+The script supports:
+- Ubuntu/Debian and RHEL/CentOS/Fedora
+- Automatic firewall configuration (UFW, firewalld, iptables)
+- Idempotent installation (safe to run multiple times)
 
 ---
 
@@ -782,6 +927,7 @@ This stack runs **without security** for lab/testing use:
 - **Alertmanager**: `http://<IP>:9093`
 - **cAdvisor**: `http://<IP>:8080`
 - **Node Exporter**: `http://<IP>:9100/metrics`
+- **Blackbox Exporter**: `http://<IP>:9115/metrics`
 
 ### Useful Grafana Dashboard IDs
 
@@ -809,11 +955,14 @@ Browse more at: https://grafana.com/grafana/dashboards/
 ```
 .
 ├── manage.sh                 # Unified management script
+├── install-node-exporter.sh  # Script to install monitoring on remote VMs
 ├── docker-compose.yml        # Main compose file
 ├── .env.example             # Environment variable template
 ├── README.md                # This file
 ├── alertmanager/
 │   └── alertmanager.yml     # Alert routing config
+├── blackbox/
+│   └── blackbox.yml         # Blackbox exporter config (ping/uptime)
 ├── filebeat/
 │   └── filebeat.yml        # Log collection config
 ├── logstash/
