@@ -276,6 +276,20 @@ docker compose restart [service-name]
    - **Time field name**: `@timestamp`
 4. Click **Save & test** (may show error until data is indexed - see Troubleshooting)
 
+**Add AWS CloudWatch Data Source (Optional - for AWS S3 monitoring):**
+1. Go to **Configuration** → **Data sources** → **Add data source**
+2. Select **CloudWatch**
+3. Configure AWS credentials:
+   - **Auth Provider**: Choose one:
+     - **Access & Secret Key**: Enter AWS Access Key ID and Secret Access Key
+     - **Credentials File**: Path to AWS credentials file (e.g., `/root/.aws/credentials`)
+     - **Default**: Use IAM role if running on EC2
+   - **Default Region**: Select your AWS region (e.g., `us-east-1`)
+4. Click **Save & test**
+5. Import dashboard **22632** (AWS S3 CloudWatch) to monitor S3 buckets, storage metrics, and request metrics
+
+**Note:** CloudWatch data source requires AWS credentials with appropriate permissions (CloudWatch read access, S3 metrics access).
+
 #### Step 2: Import Pre-built Dashboards
 
 Grafana has thousands of community dashboards. Recommended ones:
