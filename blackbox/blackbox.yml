@@ -12,4 +12,3 @@ modules:
     http:
       valid_status_codes: []    # Empty means 2xx
       method: GET
-

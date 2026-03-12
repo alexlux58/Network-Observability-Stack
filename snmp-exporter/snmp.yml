@@ -1,18 +1,17 @@
-auths:
-  public_v2:
-    version: 2
-    community: public
-
 modules:
   # General system overview (hostname, description, uptime, contact/location, etc.)
   system:
-    auth: public_v2
+    version: 2
+    auth:
+      community: public
     walk:
       - 1.3.6.1.2.1.1        # system
 
   # Interface statistics (basic + high-capacity counters)
   if_mib:
-    auth: public_v2
+    version: 2
+    auth:
+      community: public
     walk:
       - 1.3.6.1.2.1.2        # interfaces
       - 1.3.6.1.2.1.31.1.1   # ifXTable
@@ -24,7 +23,9 @@ modules:
 
   # Host resources (CPU, memory, storage) - only works on devices that support HOST-RESOURCES-MIB
   host_resources:
-    auth: public_v2
+    version: 2
+    auth:
+      community: public
     walk:
       - 1.3.6.1.2.1.25.1     # hrSystem
       - 1.3.6.1.2.1.25.2     # hrStorage
@@ -34,7 +35,9 @@ modules:
 
   # IP stack statistics (routing, TCP/UDP counters, etc.)
   ip_stack:
-    auth: public_v2
+    version: 2
+    auth:
+      community: public
     walk:
       - 1.3.6.1.2.1.4        # ip
       - 1.3.6.1.2.1.6        # tcp
