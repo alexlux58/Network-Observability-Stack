@@ -1,0 +1,39 @@
+##
+## Network Observability Stack - hosts template
+##
+## This file is meant to be copied/merged into your machine's /etc/hosts.
+## macOS: edit with sudo:  sudo nano /etc/hosts
+##
+## IMPORTANT:
+## - Keep 127.0.0.1 and ::1 entries that already exist on your system.
+## - Use hostnames that make sense to you; feel free to rename.
+##
+
+# Work Mac (Wi‑Fi / wired)
+192.168.4.101 work-mac-wifi
+192.168.7.170 work-mac-wired
+
+# Personal / family devices
+192.168.4.99  personal-mac
+192.168.4.100 wife-mac
+192.168.4.102 wife-iphone
+192.168.7.169 my-iphone-wired
+
+# Servers / VMs
+192.168.5.8   ansible-puppet
+192.168.5.38  metasploitable
+192.168.4.155 security-onion
+192.168.4.28  ubuntu-vm
+192.168.5.9   ubuntu-serv2
+
+# Infra
+192.168.4.205 synology-nas
+192.168.4.127 raspberrypi
+192.168.4.146 proxmox1
+192.168.4.180 proxmox2
+192.168.4.222 proxmox3
+
+# Switches (SNMP-capable if enabled)
+192.168.4.23  netgear-switch-1
+192.168.4.53  netgear-switch-2
+

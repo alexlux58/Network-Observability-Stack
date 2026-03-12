@@ -1,0 +1,26 @@
+---
+# Install node_exporter + Filebeat on Linux hosts and point them at the
+# Network Observability Stack running on observability_stack_host.
+- name: Install Linux monitoring stack (node_exporter + Filebeat)
+  hosts: linux_hosts
+  become: true
+  gather_facts: true
+
+  vars:
+    observability_stack_host: "192.168.4.28"
+    install_script_remote_path: "/tmp/install-node-exporter.sh"
+
+  tasks:
+    - name: Copy install-node-exporter.sh to remote host
+      copy:
+        src: "../install-node-exporter.sh"
+        dest: "{{ install_script_remote_path }}"
+        mode: "0755"
+
+    - name: Run install-node-exporter.sh on remote host
+      environment:
+        OBSERVABILITY_STACK_HOST: "{{ observability_stack_host }}"
+      command: "bash {{ install_script_remote_path }}"
+      args:
+        creates: "/etc/systemd/system/node_exporter.service"
+

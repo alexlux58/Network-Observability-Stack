@@ -5,3 +5,11 @@ modules:
     icmp:
       preferred_ip_protocol: "ip4"
 
+  # Simple HTTP probe; considers HTTP 2xx as success
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      valid_status_codes: []    # Empty means 2xx
+      method: GET
+

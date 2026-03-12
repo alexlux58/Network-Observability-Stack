@@ -1,0 +1,33 @@
+---
+# Install Prometheus windows_exporter on Windows hosts so Prometheus on
+# prometheus_server can scrape them (add a windows_exporter job in prometheus.yml).
+- name: Install Windows exporter for Prometheus
+  hosts: windows_hosts
+  gather_facts: false
+
+  vars:
+    windows_exporter_version: "0.26.0"
+    windows_exporter_url: "https://github.com/prometheus-community/windows_exporter/releases/download/v{{ windows_exporter_version }}/windows_exporter-{{ windows_exporter_version }}-amd64.msi"
+    windows_exporter_install_path: "C:\\Program Files\\windows_exporter"
+    prometheus_server: "192.168.4.28"
+
+  tasks:
+    - name: Download windows_exporter MSI
+      win_get_url:
+        url: "{{ windows_exporter_url }}"
+        dest: "C:\\Windows\\Temp\\windows_exporter-{{ windows_exporter_version }}.msi"
+
+    - name: Install windows_exporter
+      win_package:
+        path: "C:\\Windows\\Temp\\windows_exporter-{{ windows_exporter_version }}.msi"
+        arguments: >
+          ENABLED_COLLECTORS=cpu,cs,logical_disk,net,os,service,system,textfile
+          LISTEN_ADDR=:9182
+        state: present
+
+    - name: Ensure windows_exporter service is running
+      win_service:
+        name: windows_exporter
+        state: started
+        start_mode: auto
+

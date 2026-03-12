@@ -1,0 +1,18 @@
+## Netgear Smart Managed Plus exporter config
+## NOTE: Do NOT commit real switch passwords to version control.
+##       Keep this file with placeholders in git and override with a
+##       private copy (or use Ansible/secret management) in real setups.
+
+global: 
+  retrieve_interval: 20.0
+  retries: 10
+  host: "0.0.0.0"
+  port: 9493
+
+switches: 
+  # Netgear GS308EPP switches - fill in the correct password for each
+  - hostname: "192.168.4.23"
+    password: "CHANGE_ME_SWITCH_PASSWORD"
+  - hostname: "192.168.4.53"
+    password: "CHANGE_ME_SWITCH_PASSWORD"
+

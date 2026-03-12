@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Network Observability Stack - Remote VM Monitoring Setup Script
 # This script installs node_exporter and Filebeat on a Linux VM to enable monitoring
-# by the Network Observability Stack running at 192.168.5.34
+# by the Network Observability Stack (default 192.168.4.28)
 
 set -euo pipefail
 
 # Configuration
-OBSERVABILITY_STACK_HOST="${OBSERVABILITY_STACK_HOST:-192.168.5.34}"
+OBSERVABILITY_STACK_HOST="${OBSERVABILITY_STACK_HOST:-192.168.4.28}"
 OBSERVABILITY_STACK_PORT="${OBSERVABILITY_STACK_PORT:-5044}"
 NODE_EXPORTER_VERSION="1.8.2"
 FILEBEAT_VERSION="8.15.0"

@@ -131,6 +131,20 @@ GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=admin
 ```
 
+### Observability Stack Host IP
+
+In this lab, the full observability stack (Prometheus, Logstash, Kibana, Grafana, etc.) runs on `ubuntuvm` at:
+
+- `192.168.4.28/22` (primary host IP)
+
+This IP is referenced in:
+
+- `install-node-exporter.sh` (default `OBSERVABILITY_STACK_HOST`)
+- `ansible/linux-monitoring.yml` and `ansible/windows-exporter.yml`
+- Remote VM examples in this README
+
+If you move the stack to a different host, search/replace `192.168.4.28` in these files and examples so remote agents and docs stay consistent.
+
 ### Service Configuration Files
 
 - `filebeat/filebeat.yml` - Log collection configuration
@@ -430,7 +444,7 @@ This stack can monitor remote Linux VMs for resource utilization, log errors, an
    - Configure firewall rules (if applicable)
    - Set up systemd services
 
-**On the observability stack host (192.168.5.34):**
+**On the observability stack host (192.168.4.28):**
 
 3. Edit `prometheus/prometheus.yml` and add your VM to the monitoring targets:
 
@@ -466,7 +480,7 @@ This stack can monitor remote Linux VMs for resource utilization, log errors, an
    ```
 
 5. Verify targets are up in Prometheus:
-   - Visit `http://192.168.5.34:9090/targets`
+   - Visit `http://192.168.4.28:9090/targets`
    - Check that `remote_node_exporter` and `blackbox_icmp` targets show as "UP"
 
 ### What Gets Monitored
@@ -482,7 +496,7 @@ This stack can monitor remote Linux VMs for resource utilization, log errors, an
 - System logs (`/var/log/syslog`, `/var/log/messages`, `/var/log/auth.log`)
 - Application logs (`/var/log/*.log`)
 - All logs are sent to Logstash and indexed in Elasticsearch
-- View logs in Kibana: `http://192.168.5.34:5601`
+- View logs in Kibana: `http://192.168.4.28:5601`
 
 **Uptime/Ping (via blackbox_exporter):**
 - ICMP ping monitoring
@@ -520,32 +534,93 @@ The following alerts are automatically configured for remote VMs:
 ### Troubleshooting Remote VMs
 
 **VM not showing up in Prometheus:**
-1. Check firewall: Ensure port 9100 is accessible from 192.168.5.34
+1. Check firewall: Ensure port 9100 is accessible from 192.168.4.28
 2. Verify node_exporter is running: `systemctl status node_exporter` on the VM
 3. Test connectivity: `curl http://vm-ip:9100/metrics` from the stack host
 
 **Logs not appearing in Kibana:**
 1. Check Filebeat status: `systemctl status filebeat` on the VM
-2. Verify connectivity: `telnet 192.168.5.34 5044` from the VM
+2. Verify connectivity: `telnet 192.168.4.28 5044` from the VM
 3. Check Filebeat logs: `journalctl -u filebeat -f` on the VM
 
 **Ping monitoring not working:**
 1. Ensure blackbox_exporter is running: `docker ps | grep blackbox`
 2. Verify ICMP is allowed (blackbox_exporter needs NET_RAW capability)
-3. Check Prometheus targets: `http://192.168.5.34:9090/targets`
+3. Check Prometheus targets: `http://192.168.4.28:9090/targets`
 
 ### Customizing the Installation Script
 
 You can customize the observability stack host IP by setting an environment variable:
 
 ```bash
-OBSERVABILITY_STACK_HOST=192.168.5.34 sudo bash install-node-exporter.sh
+OBSERVABILITY_STACK_HOST=192.168.4.28 sudo bash install-node-exporter.sh
 ```
 
 The script supports:
 - Ubuntu/Debian and RHEL/CentOS/Fedora
 - Automatic firewall configuration (UFW, firewalld, iptables)
 - Idempotent installation (safe to run multiple times)
+
+---
+
+## 🤖 Ansible Playbooks (Linux & Windows)
+
+For larger environments, you can automate remote agent installation with Ansible.
+
+### Inventory Example
+
+An example inventory is provided at `ansible/inventory.example.ini`:
+
+```ini
+[linux_hosts]
+ansible-puppet ansible_host=192.168.5.8
+
+[linux_hosts:vars]
+ansible_user=YOUR_SSH_USER
+ansible_become=true
+
+[windows_hosts]
+win-desktop-1 ansible_host=192.168.4.210
+
+[windows_hosts:vars]
+ansible_user=YOUR_WINDOWS_USER
+ansible_password=YOUR_WINDOWS_PASSWORD
+ansible_connection=winrm
+ansible_winrm_transport=ntlm
+ansible_winrm_server_cert_validation=ignore
+```
+
+Copy this file, adjust IPs/credentials, and point Ansible at it with `-i`.
+
+### Linux Monitoring Playbook
+
+`ansible/linux-monitoring.yml`:
+
+- Copies `install-node-exporter.sh` to each host in the `linux_hosts` group.
+- Runs it with `OBSERVABILITY_STACK_HOST` set (defaults to `192.168.4.28`).
+
+Run it:
+
+```bash
+cd ansible
+ansible-playbook -i inventory.example.ini linux-monitoring.yml
+```
+
+### Windows Exporter Playbook
+
+`ansible/windows-exporter.yml`:
+
+- Downloads and installs `windows_exporter` as a Windows service.
+- Listens on port `9182` for Prometheus scraping.
+
+Run it:
+
+```bash
+cd ansible
+ansible-playbook -i inventory.example.ini windows-exporter.yml
+```
+
+After running these playbooks, add the new targets to the `remote_node_exporter` (Linux) and a new `windows_exporter` job (Windows) in `prometheus/prometheus.yml`, then reload Prometheus.
 
 ---
 

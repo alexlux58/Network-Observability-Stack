@@ -296,3 +296,101 @@ services:
           memory: 128M
         reservations:
           memory: 64M
+
+  snmp_exporter:
+    image: prom/snmp-exporter:v0.25.0
+    ports:
+      - "9116:9116"
+    volumes:
+      - ./snmp-exporter/snmp.yml:/etc/snmp_exporter/snmp.yml:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "com.observability.service=snmp_exporter"
+      - "com.observability.role=exporter"
+
+  prosafe_exporter:
+    image: tillsteinbach/prosafe_exporter_python:latest
+    ports:
+      - "9493:9493"
+    volumes:
+      - ./prosafe_exporter/config.yml:/etc/prosafe_exporter/config.yml:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "com.observability.service=prosafe_exporter"
+      - "com.observability.role=exporter"
+
+  mysql_exporter:
+    image: prom/mysqld-exporter:v0.15.1
+    ports:
+      - "9104:9104"
+    environment:
+      # Format: user:password@(hostname:3306)/
+      - DATA_SOURCE_NAME=monitor_user:CHANGE_ME_PASSWORD@(192.168.1.100:3306)/
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "com.observability.service=mysql_exporter"
+      - "com.observability.role=exporter"
+
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    ports:
+      - "9187:9187"
+    environment:
+      - DATA_SOURCE_NAME=postgresql://monitor_user:CHANGE_ME_PASSWORD@192.168.1.101:5432/postgres?sslmode=disable
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "com.observability.service=postgres_exporter"
+      - "com.observability.role=exporter"
+
+  redis_exporter:
+    image: oliver006/redis_exporter:v1.58.0
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis://192.168.1.102:6379
+      # - REDIS_PASSWORD=YourRedisPassword # Uncomment if your Redis has a password
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "com.observability.service=redis_exporter"
+      - "com.observability.role=exporter"
+
+  nginx_exporter:
+    image: nginx/nginx-prometheus-exporter:1.1.0
+    ports:
+      - "9113:9113"
+    command:
+      - -nginx.scrape-uri=http://192.168.1.105:8080/stub_status
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "com.observability.service=nginx_exporter"
+      - "com.observability.role=exporter"

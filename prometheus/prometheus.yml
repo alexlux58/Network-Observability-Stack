@@ -22,6 +22,30 @@ scrape_configs:
     static_configs:
       - targets: ['blackbox_exporter:9115']
 
+  # SNMP monitoring (network devices) via snmp_exporter
+  # Add SNMP-capable device IPs/hostnames under static_configs.targets below.
+  # Prometheus scrapes snmp_exporter, which then polls the target over UDP/161.
+  - job_name: 'snmp'
+    scrape_interval: 60s
+    metrics_path: /snmp
+    params:
+      # Module name must exist in ./snmp-exporter/snmp.yml
+      module: [if_mib]
+    static_configs:
+      - targets:
+          # Netgear switches (if SNMP is enabled on them)
+          - '192.168.4.23'
+          - '192.168.4.53'
+          # Synology NAS (enable SNMP in DSM)
+          - '192.168.4.205'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: snmp_exporter:9116
+
   # Remote VM monitoring - add your VM IPs here
   # After deploying install-node-exporter.sh on a VM, add its IP below
   - job_name: 'remote_node_exporter'
@@ -41,12 +65,38 @@ scrape_configs:
       module: [icmp]
     scrape_interval: 30s
     static_configs:
-      # Example: Add your VM IPs or hostnames here
       - targets:
-          - '192.168.5.8'  # ansible-puppet
-        labels:
-          host: 'ansible-puppet'
-          env: 'production'
+          # Gateway / router
+          - '192.168.4.1'    # eero (gateway)
+
+          # Macs / laptops / phones
+          - '192.168.4.101'  # work-mac-wifi
+          - '192.168.7.170'  # work-mac-wired
+          - '192.168.4.100'  # wife-mac
+          - '192.168.4.102'  # wife-iphone
+          - '192.168.4.99'   # personal-mac
+          - '192.168.7.169'  # my-iphone
+
+          # Servers / VMs
+          - '192.168.5.8'    # ansible-puppet
+          - '192.168.5.38'   # metasploitable
+          - '192.168.4.155'  # security-onion
+          - '192.168.4.28'   # ubuntu-vm
+          - '192.168.5.9'    # ubuntu-serv2
+
+          # Infra
+          - '192.168.4.205'  # synology-nas
+          - '192.168.4.127'  # raspberrypi
+          - '192.168.4.146'  # proxmox1
+          - '192.168.4.180'  # proxmox2
+          - '192.168.4.222'  # proxmox3
+
+          # Switches (no SNMP, but ICMP works)
+          - '192.168.4.23'   # netgear-switch-1
+          - '192.168.4.53'   # netgear-switch-2
+
+          # External endpoint
+          - 'alexflux.com'
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -54,6 +104,53 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox_exporter:9115
+
+  # HTTP(S) availability checks via blackbox_exporter
+  - job_name: 'blackbox_http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    scrape_interval: 60s
+    static_configs:
+      - targets:
+          - 'https://alexflux.com'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox_exporter:9115
+
+  # Netgear Smart Managed Plus switches via prosafe_exporter
+  - job_name: 'prosafe_exporter'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['prosafe_exporter:9493']
+
+  # MySQL / MariaDB via mysqld_exporter
+  - job_name: 'mysql_exporter'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['mysql_exporter:9104']
+
+  # PostgreSQL via postgres_exporter
+  - job_name: 'postgres_exporter'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['postgres_exporter:9187']
+
+  # Redis via redis_exporter
+  - job_name: 'redis_exporter'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['redis_exporter:9121']
+
+  # NGINX status via nginx-prometheus-exporter
+  - job_name: 'nginx_exporter'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['nginx_exporter:9113']
 
 alerting:
   alertmanagers:
