@@ -1,0 +1,133 @@
+{
+  "id": null,
+  "uid": "network-uptime-blackbox",
+  "title": "Network Uptime - Blackbox",
+  "tags": ["network", "blackbox"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "row",
+      "title": "Overview",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Hosts UP (ICMP)",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 1 },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["last"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "expr": "count by () (probe_success{job=\"blackbox_icmp\"} == 1)",
+          "legendFormat": "up",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Hosts DOWN (ICMP)",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 1 },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["last"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "expr": "count by () (probe_success{job=\"blackbox_icmp\"} == 0)",
+          "legendFormat": "down",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeSeries",
+      "title": "Ping Latency (seconds)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 5 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr": "probe_duration_seconds{job=\"blackbox_icmp\"}",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "HTTP Checks",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+      "id": 5
+    },
+    {
+      "id": 6,
+      "type": "timeSeries",
+      "title": "HTTP Success (probe_success)",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 14 },
+      "targets": [
+        {
+          "expr": "probe_success{job=\"blackbox_http\"}",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeSeries",
+      "title": "HTTP Latency (seconds)",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "probe_duration_seconds{job=\"blackbox_http\"}",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  }
+}
+

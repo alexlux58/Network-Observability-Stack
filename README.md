@@ -334,6 +334,24 @@ Grafana has thousands of community dashboards. Recommended ones:
 
 Browse more at: https://grafana.com/grafana/dashboards/
 
+#### Step 2.5: Built-in Network Dashboards (Auto-Provisioned)
+
+This repo also ships a few ready-to-use Grafana dashboards that are auto-provisioned when Grafana starts:
+
+- `Network Devices - SNMP` (`uid: network-devices-snmp`)
+  - Visualizes `snmp` job targets and basic interface traffic from `snmp_exporter`.
+- `Network Uptime - Blackbox` (`uid: network-uptime-blackbox`)
+  - Shows ICMP and HTTP uptime/latency from `blackbox_icmp` and `blackbox_http` jobs.
+- `Netgear ProSAFE Switches` (`uid: netgear-prosafe-switches`)
+  - Uses `prosafe_exporter` metrics for your Netgear Plus switches.
+
+They live under:
+
+- `grafana/dashboards/*.json`
+- Provisioning config: `grafana/provisioning/dashboards/network-observability.yml`
+
+After (re)starting Grafana, find them in the **“Network Observability”** folder in the Grafana UI.
+
 #### Step 3: Create Custom Dashboards
 
 **Host System Overview:**

@@ -1,0 +1,97 @@
+{
+  "id": null,
+  "uid": "netgear-prosafe-switches",
+  "title": "Netgear ProSAFE Switches",
+  "tags": ["network", "netgear", "prosafe"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "row",
+      "title": "Switch Overview",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Switch Info",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 1 },
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "prosafe_switch_info",
+          "refId": "A",
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Port Traffic",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "id": 3
+    },
+    {
+      "id": 4,
+      "type": "timeSeries",
+      "title": "Port Receive Bytes/s",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr": "rate(prosafe_receive_bytes_total[5m])",
+          "legendFormat": "{{hostname}} port {{port}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeSeries",
+      "title": "Port Transmit Bytes/s",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "expr": "rate(prosafe_transmit_bytes_total[5m])",
+          "legendFormat": "{{hostname}} port {{port}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  }
+}
+

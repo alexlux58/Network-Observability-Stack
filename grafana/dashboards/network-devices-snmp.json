@@ -1,0 +1,149 @@
+{
+  "id": null,
+  "uid": "network-devices-snmp",
+  "title": "Network Devices - SNMP",
+  "tags": ["network", "snmp"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "row",
+      "title": "Overview",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Devices UP (SNMP scrape success)",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 1 },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["last"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "expr": "count by () (up{job=\"snmp\"} == 1)",
+          "legendFormat": "up",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Devices DOWN (SNMP scrape failed)",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 1 },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["last"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "expr": "count by () (up{job=\"snmp\"} == 0)",
+          "legendFormat": "down",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "SNMP Targets",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 5 },
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"snmp\"}",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Interface Traffic (per device)",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+      "id": 5
+    },
+    {
+      "id": 6,
+      "type": "timeSeries",
+      "title": "Interface Inbound (bytes/s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(ifHCInOctets[5m])",
+          "legendFormat": "{{instance}} {{ifDescr}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeSeries",
+      "title": "Interface Outbound (bytes/s)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(ifHCOutOctets[5m])",
+          "legendFormat": "{{instance}} {{ifDescr}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  }
+}
+
