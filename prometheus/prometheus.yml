@@ -29,8 +29,9 @@ scrape_configs:
     scrape_interval: 60s
     metrics_path: /snmp
     params:
-      # Module name must exist in ./snmp-exporter/snmp.yml
+      # Module and auth names must exist in ./snmp-exporter/snmp.yml
       module: [if_mib]
+      auth: [public_v2]
     static_configs:
       - targets:
           # Netgear switches (if SNMP is enabled on them)
