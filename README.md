@@ -728,8 +728,22 @@ newgrp docker
 ### Diagnostic Commands
 
 ```bash
-# Check all services status
+# Check all services status (via helper script)
 ./manage.sh status
+
+# List all Docker services for this stack
+docker-compose ps
+
+# Check only exporters (handy when troubleshooting metrics)
+docker-compose ps | grep exporter
+
+# Tail logs for a specific service (e.g. snmp_exporter, blackbox_exporter, mysql_exporter)
+docker-compose logs -f snmp_exporter
+docker-compose logs -f blackbox_exporter
+
+# If you prefer container names:
+docker ps | grep network-observability-stack
+docker logs network-observability-stack_snmp_exporter_1 --tail=50
 
 # Check Elasticsearch health
 curl -s http://localhost:9200/_cluster/health?pretty
@@ -768,6 +782,25 @@ This checks:
 - Service endpoints
 
 **Note:** All services now have health checks configured in `docker-compose.yml`. Docker automatically monitors service health and can restart unhealthy containers. Health check status is visible in `docker ps` output.
+
+### Restarting Services
+
+```bash
+# Restart all services (via helper script)
+./manage.sh restart
+
+# Restart all services (raw Docker Compose)
+docker-compose restart
+
+# Restart a single service (e.g. snmp_exporter, mysql_exporter)
+docker-compose restart snmp_exporter
+docker-compose restart mysql_exporter
+```
+
+If you see a container crash-looping (e.g. `Restarting (1)` in `docker ps`), combine:
+
+- `docker-compose logs -f <service>` to see the error, then
+- fix the config and run `docker-compose restart <service>` again.
 
 ### User Management
 
